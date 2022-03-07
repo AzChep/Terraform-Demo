@@ -100,6 +100,11 @@ output "tls_private_key" {
     value = tls_private_key.example_ssh.private_key_pem 
     sensitive = true
 }
+output "public_ip_address" {
+
+    value = azurerm_public_ip.TFlip.*.ip_address
+
+}
 resource "azurerm_linux_virtual_machine" "myterraformvm" {                      //LinuxVm
     name                  = "TFLNVM"
     location              = azurerm_resource_group.rg.location
@@ -155,5 +160,30 @@ resource "azurerm_linux_virtual_machine" "myterraformvm" {                      
 
     SETTINGS
 
-    }
+  }
+    resource "azurerm_postgresql_server" "postistressi" {
+    name                = "tfpostistressi"
+    location            = azurerm_resource_group.rg.location
+    resource_group_name = azurerm_resource_group.rg.name
+
+    sku_name = "B_Gen5_2"
+
+    storage_mb                   = 5120
+    backup_retention_days        = 7
+    geo_redundant_backup_enabled = false
+    auto_grow_enabled            = true
+
+    administrator_login          = var.administrator_login
+    administrator_login_password = var.administrator_login_password
+    version                      = "11"
+    ssl_enforcement_enabled      = true
+  }
+
+  resource "azurerm_postgresql_database" "example" {
+    name                = "academy"
+    resource_group_name = azurerm_resource_group.rg.name
+    server_name         = azurerm_postgresql_server.postistressi.name
+    charset             = "UTF8"
+    collation           = "English_United States.1252"
+}
     
