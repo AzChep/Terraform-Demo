@@ -8,9 +8,6 @@ terraform {
 
   required_version = ">= 1.1.0"
 }
-data "template_file" "nginx-vm-cloud-init" {                          //custom data??
-  template = file("install-nginx.sh")
-}
 provider "azurerm" {
   features {}
   subscription_id           = var.subscription_id
@@ -103,7 +100,7 @@ output "tls_private_key" {
     value = tls_private_key.example_ssh.private_key_pem 
     sensitive = true
 }
-resource "azurerm_linux_virtual_machine" "myterraformvm" {                      //Linux VM
+resource "azurerm_linux_virtual_machine" "myterraformvm" {                      //LinuxVm
     name                  = "TFLNVM"
     location              = azurerm_resource_group.rg.location
     resource_group_name   = azurerm_resource_group.rg.name
@@ -126,7 +123,6 @@ resource "azurerm_linux_virtual_machine" "myterraformvm" {                      
     computer_name  = "myvm"
     admin_username = "azureuser"
     disable_password_authentication = true
-    custom_data = base64encode(data.template_file.nginx-vm-cloud-init.rendered)
 
     admin_ssh_key {
         username       = "azureuser"
@@ -140,4 +136,24 @@ resource "azurerm_linux_virtual_machine" "myterraformvm" {                      
     tags = {
         environment = "Terraform Demo"
     }
-}
+  }
+    resource "azurerm_virtual_machine_extension" "vme" {
+
+    virtual_machine_id         = azurerm_linux_virtual_machine.myterraformvm.id
+    name                       = "vme"
+    publisher                  = "Microsoft.Azure.Extensions"
+    type                       = "CustomScript"
+    type_handler_version       = "2.0"
+    auto_upgrade_minor_version = true
+      settings = <<SETTINGS
+  
+    {
+
+    "commandToExecute": "sudo apt-get update && apt-get install -y apache2 && echo 'hello world' > /var/www/html/index.html"
+
+    }
+
+    SETTINGS
+
+    }
+    
