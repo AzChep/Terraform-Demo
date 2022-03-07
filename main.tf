@@ -8,14 +8,16 @@ terraform {
 
   required_version = ">= 1.1.0"
 }
-
+data "template_file" "nginx-vm-cloud-init" {                          //custom data??
+  template = file("install-nginx.sh")
+}
 provider "azurerm" {
   features {}
   subscription_id           = var.subscription_id
   tenant_id                 = var.subscription_tenant_id
 }
 
-resource "azurerm_resource_group" "rg" {
+resource "azurerm_resource_group" "rg" {                              //luo RG
   name     = var.resource_group_name
   location = "westeurope"
 
@@ -24,19 +26,19 @@ resource "azurerm_resource_group" "rg" {
      Team = "DevOps"
    }
 }
-resource "azurerm_virtual_network" "vnet" {
+resource "azurerm_virtual_network" "vnet" {                         //Virtual network
     name                = "myTFVnet"
     address_space       = ["10.0.0.0/16"]
     location            = "westeurope"
     resource_group_name = azurerm_resource_group.rg.name
 }
-resource "azurerm_subnet" "scubnet" {
+resource "azurerm_subnet" "scubnet" {                               //subnet
   name                 = "TFscubanet"
   resource_group_name  = azurerm_resource_group.rg.name
   virtual_network_name = azurerm_virtual_network.vnet.name
   address_prefixes     = ["10.0.1.0/24"]
 }
-resource "azurerm_storage_account" "villeformstorage" {
+resource "azurerm_storage_account" "villeformstorage" {             //storage account
   name                     = "villeformstorage"
   resource_group_name      = azurerm_resource_group.rg.name
   location                 = azurerm_resource_group.rg.location
@@ -48,19 +50,19 @@ resource "azurerm_storage_account" "villeformstorage" {
     environment = "staging"
   }
 }
-resource "azurerm_storage_container" "kontti" {
+resource "azurerm_storage_container" "kontti" {                     //container blöb
   name                  = "blobsuli"
   storage_account_name  = azurerm_storage_account.villeformstorage.name
   container_access_type = "blob"
 }
-resource   "azurerm_public_ip"   "TFlip"   { 
+resource   "azurerm_public_ip"   "TFlip"   {                        //public IP
   name   =   "TFlip" 
   location   =   "westeurope" 
   resource_group_name   =   azurerm_resource_group.rg.name 
   allocation_method   =   "Dynamic" 
   sku   =   "Basic" 
 }
-resource   "azurerm_network_interface"   "TFnic"   { 
+resource   "azurerm_network_interface"   "TFnic"   {                //network interface card 
   name   =   "myvm1-nic" 
   location   =   "westeurope" 
   resource_group_name   =   azurerm_resource_group.rg.name 
@@ -72,6 +74,27 @@ resource   "azurerm_network_interface"   "TFnic"   {
     public_ip_address_id   =   azurerm_public_ip.TFlip.id
   } 
 }
+resource "azurerm_network_security_group" "myterraformnsg" {      //NSG
+    name                = "myNetworkSecurityGroup"
+    location            = "westeurope"
+    resource_group_name = azurerm_resource_group.rg.name
+
+    security_rule {
+        name                       = "HTTP"
+        priority                   = 1001
+        direction                  = "Inbound"
+        access                     = "Allow"
+        protocol                   = "Tcp"
+        source_port_range          = "*"
+        destination_port_range     = "80"
+        source_address_prefix      = "*"
+        destination_address_prefix = "*"
+    }
+
+    tags = {
+        environment = "Terraform Demo"
+    }
+}
 resource "tls_private_key" "example_ssh" {
   algorithm = "RSA"
   rsa_bits = 4096
@@ -80,7 +103,7 @@ output "tls_private_key" {
     value = tls_private_key.example_ssh.private_key_pem 
     sensitive = true
 }
-resource "azurerm_linux_virtual_machine" "myterraformvm" {
+resource "azurerm_linux_virtual_machine" "myterraformvm" {                      //Linux VM
     name                  = "TFLNVM"
     location              = azurerm_resource_group.rg.location
     resource_group_name   = azurerm_resource_group.rg.name
@@ -103,6 +126,7 @@ resource "azurerm_linux_virtual_machine" "myterraformvm" {
     computer_name  = "myvm"
     admin_username = "azureuser"
     disable_password_authentication = true
+    custom_data = base64encode(data.template_file.nginx-vm-cloud-init.rendered)
 
     admin_ssh_key {
         username       = "azureuser"
